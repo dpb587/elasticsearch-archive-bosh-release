@@ -1,0 +1,18 @@
+---
+name: "elasticsearch-archiver"
+packages:
+  - "elasticsearch-archiver"
+templates:
+  bin/control: bin/control
+  bin/run: bin/run
+properties:
+  elasticsearch_archiver.gpg.public_key: {}
+  elasticsearch_archiver.s3.endpoint: {}
+  elasticsearch_archiver.s3.access_key: {}
+  elasticsearch_archiver.s3.secret_key: {}
+  elasticsearch_archiver.s3.bucket: {}
+  elasticsearch_archiver.s3.prefix: {}
+  elasticsearch_archiver.cron_schedule: {}
+  elasticsearch_archiver.ignore_closed: {}
+  elasticsearch_archiver.optimize_index: {}
+  elasticsearch_archiver.elasticsearch: {}

@@ -1,0 +1,178 @@
+#!/bin/bash
+
+set -eu
+
+es="<%= p('elasticsearch_archiver.elasticsearch') %>"
+dumpdir=/var/vcap/store/elasticsearch-archiver/state
+
+export PATH="/var/vcap/packages/elasticsearch-archiver/bin:$PATH"
+
+mkdir -p "$dumpdir"
+cd "$dumpdir"
+
+REM () {
+  /bin/echo $( date -u +"%Y-%m-%dT%H:%M:%SZ" ) "$@"
+}
+
+REM 'starting'
+
+export GNUPGHOME=/var/vcap/data/elasticsearch-archiver/.gpg
+[ ! -e "$GNUPGHOME" ] || rm -fr "$GNUPGHOME"
+mkdir -p "$GNUPGHOME"
+chmod -R 700 "$GNUPGHOME"
+
+cat > "$GNUPGHOME/import_key" <<EOF
+<%= p('elasticsearch_archiver.gpg.public_key') %>
+EOF
+
+gpg --import "$GNUPGHOME/import_key"
+RECIPIENT=$( gpg --batch --with-colons "$GNUPGHOME/import_key" | head -n1 | cut -d: -f5 )
+
+mc --quiet --json config host add mc \
+  "<%= p('elasticsearch_archiver.s3.endpoint') %>" \
+  "<%= p('elasticsearch_archiver.s3.access_key') %>" \
+  "<%= p('elasticsearch_archiver.s3.secret_key') %>" \
+  > /dev/null
+
+for index_name in $( curl -s http://$es/_cat/indices?h=index | sort -r ) ; do
+  REM "$index_name: starting"
+
+  TS=$( date -u +"%Y%m%dT%H%M%SZ" )
+
+  index_state=$( curl -s http://$es/_cat/indices?h=index,status | grep "^$index_name " | awk '{ print $2 }' )
+  
+  if [ "close" == "$index_state" ] ; then
+    <% if p('elasticsearch_archiver.ignore_closed') %>
+      REM "$index_name: closed"
+
+      continue
+    <% end %>
+
+    REM "$index_name: opening"
+
+    curl -sX POST http://$es/$index_name/_open >/dev/null
+
+    status=red
+
+    while [ "$status" != "green" ] ; do
+      sleep 2
+      
+      status=$( curl -s http://$es/_cat/indices?h=index,health | grep "^$index_name " | awk '{ print $2 }' )
+    done
+  fi
+  
+  <% if p('elasticsearch_archiver.optimize_index') %>
+    segments=$( wget -qO- "http://$es/$index_name/_segments" | jq '.indices | to_entries[0].value.shards | to_entries | map(.value[0].segments | keys | length) | map(select(1 < .)) | add // 0' )
+    
+    if [ "0" != "$segments" ] ; then
+      REM "$index_name: optimizing"
+    
+      curl -sX POST "http://$es/$index_name/_optimize?max_num_segments=1" > /dev/null
+    fi
+  <% end %>
+
+  translog_operations=$( curl -s "http://$es/$index_name/_stats?level=shards" | jq -r '[ .indices | .[.|keys[0]].shards | to_entries | sort_by(.key)[].value[].translog.operations ] | add // 0' )
+  
+  if [ "0" != "$translog_operations" ] ; then
+    REM "$index_name: flushing"
+    
+    curl -sX POST "http://$es/$index_name/_flush/synced" > /dev/null
+  fi
+
+  curl -s "http://$es/$index_name/_stats?level=shards" | jq -r '[ .indices | .[.|keys[0]].shards | to_entries | sort_by(.key)[].value[].commit | (.generation | tostring ) + ":" + .user_data.translog_id ][]'
+  index_checksum=$( curl -s "http://$es/$index_name/_stats?level=shards" | jq -r '[ .indices | .[.|keys[0]].shards | to_entries | sort_by(.key)[].value[].commit | (.generation | tostring ) + ":" + .user_data.translog_id ] | join(";")' | openssl md5 | awk '{ print $2 }' )
+
+  REM "$index_name: checksum $index_checksum"
+
+  existing_checksum=$( [ ! -e "$index_name/checksum" ] || cat "$index_name/checksum" 2>/dev/null )
+
+  if [ "$index_checksum" == "$existing_checksum" ] ; then
+    REM "$index_name: unchanged"
+  else
+    [ ! -e "$index_name" ] || rm -fr "$index_name"
+    mkdir "$index_name"
+
+    REM "$index_name: dumping mapping"
+  
+    elasticdump \
+      --input="http://$es/$index_name" \
+      --output="$index_name/mapping-$TS.json" \
+      --type=mapping \
+      >/dev/null
+  
+    REM "$index_name: dumping data"
+  
+    elasticdump \
+      --input="http://$es/$index_name" \
+      --output="$index_name/data-$TS.json" \
+      --limit=10240 \
+      --type=data \
+      >/dev/null
+
+    REM "$index_name:" $( wc -l "$index_name/data-$TS.json" | awk '{ print $1 }' ) "documents"
+
+    REM "$index_name: compressing"
+
+    xz "$index_name/data-$TS.json"
+    xz "$index_name/mapping-$TS.json"
+
+    REM "$index_name: encrypting"
+
+    gpg --trust-model always --recipient "$RECIPIENT" --encrypt "$index_name/mapping-$TS.json.xz"
+    rm "$index_name/mapping-$TS.json.xz"
+
+    gpg --trust-model always --recipient "$RECIPIENT" --encrypt "$index_name/data-$TS.json.xz"
+    rm "$index_name/data-$TS.json.xz"
+  
+    REM "$index_name: uploading"
+
+    success=false
+    
+    for retry in {1..3} ; do
+      mc --quiet --json cp \
+        "$index_name/mapping-$TS.json.xz.gpg" \
+        "mc/<%= p('elasticsearch_archiver.s3.bucket') %>/<%= p('elasticsearch_archiver.s3.prefix') %>$index_name/mapping-$TS.json.xz.gpg" \
+        > /dev/null \
+        || continue
+      success=true
+      break
+    done
+    
+    [ "true" == "$success" ] || exit 1
+
+    rm "$index_name/mapping-$TS.json.xz.gpg"
+
+    success=false
+    
+    for retry in {1..3} ; do
+      mc --quiet --json cp \
+        "$index_name/data-$TS.json.xz.gpg" \
+        "mc/<%= p('elasticsearch_archiver.s3.bucket') %>/<%= p('elasticsearch_archiver.s3.prefix') %>$index_name/data-$TS.json.xz.gpg" \
+        > /dev/null \
+        || continue
+      success=true
+      break
+    done
+    
+    [ "true" == "$success" ] || exit 1
+
+    rm "$index_name/data-$TS.json.xz.gpg"
+
+    echo -n "$index_checksum" > "$index_name/checksum"
+  fi
+
+  if [ "close" == "$index_state" ] ; then
+    REM "$index_name: closing"
+
+    curl -sX POST http://$es/$index_name/_close >/dev/null
+  fi
+
+  REM "$index_name: finished"
+done
+
+REM 'cleaning'
+
+rm -fr "$GNUPGHOME"
+rm -fr "$HOME/.mc"
+
+REM 'finished'

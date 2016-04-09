@@ -1,0 +1,5 @@
+#!/bin/bash
+
+wget \
+  -O "jq-${VERSION}.tar.gz" \
+  "https://github.com/stedolan/jq/archive/jq-${VERSION}.tar.gz"

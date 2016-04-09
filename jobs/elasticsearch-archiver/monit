@@ -1,0 +1,5 @@
+check process elasticsearch-archiver
+  with pidfile /var/vcap/sys/run/elasticsearch-archiver/control.pid
+  start program "/var/vcap/jobs/elasticsearch-archiver/bin/control start"
+  stop program "/var/vcap/jobs/elasticsearch-archiver/bin/control stop"
+  group vcap

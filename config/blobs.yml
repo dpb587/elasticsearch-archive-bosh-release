@@ -1,0 +1,17 @@
+---
+elasticdump/elasticdump-1.1.3.tar.gz:
+  object_id: 958870d8-a5b1-4c30-92e7-bee4a8931edf
+  sha: e7f83048474120ed9cacd6d525a35dfd895bfacc
+  size: 1342825
+jq/jq-1.5.tar.gz:
+  object_id: 7cbcb0ed-29cb-441e-a7b2-1361e8151634
+  sha: 664638b560d9e734178e8cafb21d98817af5b5f3
+  size: 1118086
+mc/mc:
+  object_id: 02905971-3bf8-4c52-8526-88d9f5acea40
+  sha: 59e2393f3d417b710f8b2ed9d7ce22ad46381b23
+  size: 10904320
+nodejs/node-v4.4.2.tar.gz:
+  object_id: 8c032970-f8fe-496b-8be2-ee8b082b5ebf
+  sha: ca08a51b35a6e98673eb841d0158edfcaea44c40
+  size: 22415069

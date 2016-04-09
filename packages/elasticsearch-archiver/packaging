@@ -1,0 +1,32 @@
+#!/bin/bash
+
+exec 2>&1
+
+set -e
+set -u
+
+tar -xzf jq/jq-*.tar.gz
+
+( cd jq-*
+
+  ./configure \
+    --prefix="$BOSH_INSTALL_TARGET" \
+    --disable-maintainer-mode
+  make
+  make install
+)
+
+tar -xzf nodejs/node-v*.tar.gz
+
+( cd node-*
+
+  ./configure --prefix="$BOSH_INSTALL_TARGET"
+  make
+  make install
+)
+
+tar -xzf elasticdump/elasticdump-*.tar.gz --strip-components 1 -C "$BOSH_INSTALL_TARGET/lib"
+ln -s $BOSH_INSTALL_TARGET/lib/node_modules/.bin/* "$BOSH_INSTALL_TARGET/bin"
+
+cp mc/mc "$BOSH_INSTALL_TARGET/bin/mc"
+chmod +x "$BOSH_INSTALL_TARGET/bin/mc"

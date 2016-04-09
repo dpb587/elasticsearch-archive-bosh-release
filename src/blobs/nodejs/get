@@ -1,0 +1,5 @@
+#!/bin/bash
+
+wget \
+  -O "node-v${VERSION}.tar.gz" \
+  "https://nodejs.org/dist/v4.4.2/node-v${VERSION}.tar.gz"

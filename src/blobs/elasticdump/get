@@ -1,0 +1,15 @@
+#!/bin/bash
+
+tmp=$( mktemp -d )
+
+blob_dir="$PWD"
+cd "$tmp"
+
+mkdir "elasticdump-${VERSION}"
+cd "elasticdump-${VERSION}"
+
+npm install "elasticdump@${VERSION}"
+
+cd ..
+
+tar -czf "$blob_dir/elasticdump-${VERSION}.tar.gz" "elasticdump-${VERSION}"

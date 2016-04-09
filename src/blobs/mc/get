@@ -1,0 +1,5 @@
+#!/bin/bash
+
+wget \
+  -O "mc" \
+  "https://dl.minio.io/client/mc/release/linux-amd64/archive/mc.${VERSION}"

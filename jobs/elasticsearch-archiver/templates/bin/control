@@ -1,0 +1,44 @@
+#!/bin/bash
+
+set -e
+set -u
+
+PIDFILE=/var/vcap/sys/run/elasticsearch-archiver/control.pid
+LOGDIR=/var/vcap/sys/log/elasticsearch-archiver
+RUNDIR=/var/vcap/sys/run/elasticsearch-archiver
+
+mkdir -p "$LOGDIR"
+chown vcap:vcap "$LOGDIR"
+
+exec >> $LOGDIR/control.stdout.log
+exec 2>> $LOGDIR/control.stderr.log
+
+mkdir -p "$RUNDIR"
+chown vcap:vcap "$RUNDIR"
+
+case $1 in
+
+  start)
+    echo "1" > "${PIDFILE}"
+
+    echo "<%= p('elasticsearch_archiver.cron_schedule') %> root bash -c 'exec /var/vcap/jobs/elasticsearch-archiver/bin/run >> $LOGDIR/cron.stdout.log 2>> $LOGDIR/cron.stderr.log'" > /etc/cron.d/25-vcap-elasticsearch-archiver
+    touch /etc/cron.d
+
+    ;;
+
+  stop)
+    rm /etc/cron.d/25-elasticsearch-archiver
+    touch /etc/cron.d
+    
+    unlink "${PIDFILE}"
+
+    ;;
+
+  *)
+    echo "Usage: control {start|stop}" >&2
+
+    exit 1
+
+    ;;
+
+esac
