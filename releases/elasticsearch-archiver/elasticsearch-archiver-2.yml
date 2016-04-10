@@ -1,0 +1,20 @@
+---
+packages:
+- name: elasticsearch-archiver
+  version: 16853432759c74dbb2ab966e3d5347b34c6efbba
+  fingerprint: 16853432759c74dbb2ab966e3d5347b34c6efbba
+  sha1: dd0ad9f991a5cf752ee637d9fd8386f7867057ae
+  dependencies: []
+jobs:
+- name: elasticsearch-archiver
+  version: 235380565cf96d7eb65f0d376467e13246675f0e
+  fingerprint: 235380565cf96d7eb65f0d376467e13246675f0e
+  sha1: 7a7cf879eff055e1507709d54dcde9e08998ff08
+license:
+  version: c0c5442fe8f80c0ab8aee1f0beae1f4a0d041877
+  fingerprint: c0c5442fe8f80c0ab8aee1f0beae1f4a0d041877
+  sha1: 59fa60733dceff00ed959bc18e212dbf09168038
+commit_hash: 6c205eb9
+uncommitted_changes: true
+name: elasticsearch-archiver
+version: '2'
