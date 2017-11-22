@@ -27,10 +27,10 @@ case $1 in
     ;;
 
   stop)
-    rm /etc/cron.d/25-elasticsearch-archiver
+    rm -f /etc/cron.d/25-vcap-elasticsearch-archiver
     touch /etc/cron.d
     
-    unlink "${PIDFILE}"
+    rm -f "${PIDFILE}"
 
     ;;
 
